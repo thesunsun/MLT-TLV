@@ -295,6 +295,7 @@ def run_smac_optimization(processed_data, fft_data, labels, depth, groups):
         print(f" -> Try parameters: LR={config['learning_rate']}, WD={config['weight_decay']}, Balancing Weights={config['loss_weight']}")
 
         model = FusionNet().to(DEVICE)
+        device = next(model.parameters()).device
         optimizer = optim.Adam(model.parameters(),
                                lr=config["learning_rate"],
                                weight_decay=config["weight_decay"])
@@ -307,7 +308,7 @@ def run_smac_optimization(processed_data, fft_data, labels, depth, groups):
         val_loader = DataLoader(val_set, batch_size=512)
 
         best_val_loss = float('inf')
-        smac_epochs = 30
+        smac_epochs = 70
 
         for epoch in range(1, smac_epochs + 1):
             model.train()
@@ -321,28 +322,32 @@ def run_smac_optimization(processed_data, fft_data, labels, depth, groups):
                 loss, _, _ = criterion((cls_out, reg_out), (label_target, depth_target, valid_mask))
                 loss.backward()
                 optimizer.step()
-
-            # val
             model.eval()
-            val_total_loss = 0.0
+            val_mae = 0.0
+            valid_samples = 0
+
             with torch.no_grad():
                 for batch in val_loader:
                     raw_input, fft_input = batch['raw'].to(DEVICE), batch['fft'].to(DEVICE)
-                    label_target, depth_target, valid_mask = batch['label'].to(DEVICE), batch['depth'].to(DEVICE), \
-                                                             batch['valid_depth'].to(DEVICE)
+                    depth_target = batch['depth'].to(DEVICE)
+                    valid_mask = batch['valid_depth'].to(DEVICE)
 
                     cls_out, reg_out = model(raw_input, fft_input)
-                    loss, _, _ = criterion((cls_out, reg_out), (label_target, depth_target, valid_mask))
-                    val_total_loss += loss.item()
 
-            avg_val_loss = val_total_loss / len(val_loader)
-            if avg_val_loss < best_val_loss:
-                best_val_loss = avg_val_loss
+                    if valid_mask.sum() > 0:
+                        val_mae += F.l1_loss(reg_out[valid_mask],
+                                             depth_target[valid_mask].unsqueeze(1)).item() * valid_mask.sum().item()
+                        valid_samples += valid_mask.sum().item()
+
+            avg_val_mae = val_mae / (valid_samples + 1e-7)
+            if avg_val_mae < best_val_loss:
+                best_val_loss = avg_val_mae
+
             if epoch % 10 == 0 or epoch == smac_epochs:
-                print(f"    - Epoch {epoch:02d}/{smac_epochs} | Current validation set loss: {avg_val_loss:.4f}")
+                print(f"    - Epoch {epoch:02d}/{smac_epochs}")
 
-        print(f"[SMAC Progress: {trial_count[0]}/{total_trials}] Evaluation completed -> This configuration has the best loss: {best_val_loss:.4f}")
         return best_val_loss
+
 
     # 1. Configuration Space
     cs = ConfigurationSpace()
@@ -584,7 +589,7 @@ if __name__ == "__main__":
     depth = np.concatenate([nodepths, depths])
     labels = np.concatenate([np.zeros(6159, dtype=int), np.ones(4995, dtype=int)])
     # Human experts annotate noise
-    noise_rate = 0.01
+    noise_rate = 0.012
     n_samples = len(labels)
     noise_indices = np.random.choice(n_samples, int(noise_rate * n_samples), replace=False)
     labels[noise_indices] = 1 - labels[noise_indices]
