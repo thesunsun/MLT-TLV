@@ -1,0 +1,39 @@
+# Hardware and Software Environment
+
+[Hardware]
+Operating system         Windows-10-10.0.26200-SP0
+Machine architecture     AMD64
+CPU                      12th Gen Intel(R) Core(TM) i9-12900
+GPU                      NVIDIA GeForce RTX 4090 D
+GPU memory               23.99 GiB
+NVIDIA driver            591.86
+GPU compute capability   8.9
+
+[Python and Deep Learning Environment]
+Python                   3.9.25
+PyTorch                  2.1.1+cu118
+CUDA runtime             11.8
+cuDNN                    8.7.0
+
+NumPy                    1.24.3
+pandas                   2.3.3
+SciPy                    1.13.1
+scikit-learn             1.6.1
+Matplotlib               3.9.2
+ConfigSpace              1.2.2
+SMAC                     2.4.0
+
+[Reproducibility Settings Used During Training]
+Random seed              35
+Split seed               35
+PYTHONHASHSEED           35
+CUBLAS_WORKSPACE_CONFIG  40968
+OMP_NUM_THREADS          1
+MKL_NUM_THREADS          1
+NUMEXPR_NUM_THREADS      1
+
+cuDNN deterministic      True
+cuDNN benchmark          False
+CUDA matmul TF32         False
+cuDNN TF32               False
+Deterministic algorithms True
